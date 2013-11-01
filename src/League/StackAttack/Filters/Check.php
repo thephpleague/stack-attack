@@ -30,8 +30,8 @@ abstract class Check
     public function test(Request $request)
     {
         if (call_user_func($this->rule, $request)) {
-            $request->attributes->set('stackattack.match.message', $this->getMessage());
-            $request->attributes->set('stackattack.match.type', $this->getType());
+            $request->attributes->set('stack.attack.match_message', $this->getMessage());
+            $request->attributes->set('stack.attack.match_type', $this->getType());
 
             return true;
         }

@@ -14,9 +14,9 @@ class Attack implements HttpKernelInterface
     private $app;
 
     /**
-     * @var string
+     * @var \Closure
      */
-    private $blacklistMessage = 'Unauthorized';
+    private $blacklistedResponse;
 
     /**
      * @var FilterCollection
@@ -27,18 +27,38 @@ class Attack implements HttpKernelInterface
     {
         $this->app = $app;
         $this->filters = $filters;
+
+		$this->setBlacklistedResponse();
     }
 
     public function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true)
     {
-        if ($this->whitelisted($request)) {
-            return $this->app->handle($request, $type, $catch);
-        } elseif ($this->blacklisted($request)) {
-            return new Response($this->blacklistMessage, 401);
+		// If this is not a whitelisted request, check the blacklist.
+        if (! $this->whitelisted($request)) {
+			if ($this->blacklisted($request)) {
+	            return call_user_func($this->blacklistedResponse, $request);
+			}
         }
 
         return $this->app->handle($request, $type, $catch);
     }
+
+	public function setBlacklistedResponse(\Closure $fun = null)
+	{
+		if ($fun instanceof \Closure) {
+			$this->blacklistedResponse = $fun;
+		} else {
+			$this->blacklistedResponse = function (Request $request) {
+				$message = 'Unauthorized';
+
+				if ($request->attributes->has('stack.attack.match_message')) {
+					$message = $request->attributes->get('stack.attack.match_message');
+				}
+
+				return new Response($message, 401);
+			};
+		}
+	}
 
     private function whitelisted(Request $request)
     {
@@ -62,8 +82,6 @@ class Attack implements HttpKernelInterface
             foreach ($blacklist as $rule) {
                 // If the rule passes, then this is a blacklisted request.
                 if ($rule->test($request)) {
-                    $this->blacklistMessage = $request->attributes->get('stackattack.match.message');
-
                     return true;
                 }
             }

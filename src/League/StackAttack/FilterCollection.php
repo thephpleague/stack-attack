@@ -1,4 +1,4 @@
-<?php
+git <?php
 
 namespace League\StackAttack;
 
