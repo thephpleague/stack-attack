@@ -1,6 +1,6 @@
 # League\StackAttack
 
-StackAttack is a blocking & throttling middleware for StackPHP, based heavily off of [Rack::Attack](https://github.com/kickstarter/rack-attack) for Ruby.
+StackAttack is a blocking & throttling middleware for [StackPHP](http://stackphp.com), based heavily off of [Rack::Attack](https://github.com/kickstarter/rack-attack) for Ruby.
 It currently allows _whitelisting_ and _blacklisting_.
 
 ## Install Via Composer
@@ -31,15 +31,15 @@ $filters = (new FilterCollection)
         return strpos($request->getPathInfo(), '/dev') === 0;
     });
 
-$options = array(
+$config = [
     'blacklistedResponse' => function (Request $request) {
             // A 503 response makes some bots think they had a successful DDOS
             return new Response('Service Unavailable', 503);
         }
-);
+];
 
 $app = (new Stack\Builder)
-    ->push('League\\StackAttack\\Attack', $filters, $options)
+    ->push('League\\StackAttack\\Attack', $filters, $config)
     ->resolve($app);
 
 Stack\run($app);
