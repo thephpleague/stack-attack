@@ -17,8 +17,15 @@ $filters = (new FilterCollection)
         return strpos($request->getPathInfo(), '/dev') === 0;
     });
 
+$options = array(
+    'blacklistedResponse' => function (Request $request) {
+            // A 503 response makes some bots think they had a successful DDOS
+            return new Response('Service Unavailable', 503);
+        }
+);
+
 $app = (new Builder)
-    ->push('League\\StackAttack\\Attack', $filters)
+    ->push('League\\StackAttack\\Attack', $filters, $options)
     ->resolve($app);
 
 run($app);

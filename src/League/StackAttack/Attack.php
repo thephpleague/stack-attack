@@ -23,42 +23,50 @@ class Attack implements HttpKernelInterface
      */
     private $filters;
 
-    public function __construct(HttpKernelInterface $app, FilterCollection $filters)
+    public function __construct(HttpKernelInterface $app, FilterCollection $filters, array $config = array())
     {
         $this->app = $app;
         $this->filters = $filters;
+        $this->config = $config;
 
-		$this->setBlacklistedResponse();
+        $this->setBlacklistedResponse();
     }
 
     public function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true)
     {
-		// If this is not a whitelisted request, check the blacklist.
+        // If this is not a whitelisted request, check the blacklist.
         if (! $this->whitelisted($request)) {
-			if ($this->blacklisted($request)) {
-	            return call_user_func($this->blacklistedResponse, $request);
-			}
+            if ($this->blacklisted($request)) {
+                return call_user_func($this->blacklistedResponse, $request);
+            }
         }
 
         return $this->app->handle($request, $type, $catch);
     }
 
-	public function setBlacklistedResponse(\Closure $fun = null)
-	{
-		if ($fun instanceof \Closure) {
-			$this->blacklistedResponse = $fun;
-		} else {
-			$this->blacklistedResponse = function (Request $request) {
-				$message = 'Unauthorized';
+    public function setBlacklistedResponse(\Closure $func = null)
+    {
+        if ($func !== null) {
+            $this->blacklistedResponse = $func;
+        } elseif (isset($this->config['blacklistedResponse']) && ($this->config['blacklistedResponse'] instanceof \Closure)) {
+            $this->blacklistedResponse = $this->config['blacklistedResponse'];
+        } else {
+            $this->defaultBlacklistedResponse();
+        }
+    }
 
-				if ($request->attributes->has('stack.attack.match_message')) {
-					$message = $request->attributes->get('stack.attack.match_message');
-				}
+    private function defaultBlacklistedResponse()
+    {
+        $this->blacklistedResponse = function (Request $request) {
+            $message = 'Unauthorized';
 
-				return new Response($message, 401);
-			};
-		}
-	}
+            if ($request->attributes->has('stack.attack.match_message')) {
+                $message = $request->attributes->get('stack.attack.match_message');
+            }
+
+            return new Response($message, 401);
+        };
+    }
 
     private function whitelisted(Request $request)
     {
