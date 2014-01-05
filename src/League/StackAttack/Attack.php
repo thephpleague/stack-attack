@@ -18,6 +18,8 @@ class Attack implements HttpKernelInterface
      */
     private $blacklistedResponse;
 
+    private $throttleResponse;
+
     /**
      * @var FilterCollection
      */
@@ -30,6 +32,7 @@ class Attack implements HttpKernelInterface
         $this->config = $config;
 
         $this->setBlacklistedResponse();
+        $this->setThrottleResponse();
     }
 
     public function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true)
@@ -38,6 +41,12 @@ class Attack implements HttpKernelInterface
         if (! $this->whitelisted($request)) {
             if ($this->blacklisted($request)) {
                 return call_user_func($this->blacklistedResponse, $request);
+            }
+        }
+
+        if (!is_null($this->throttleResponse)) {
+            if (! $this->checkThrottle()) {
+                return call_user_func($this->throttleResponse, $request);
             }
         }
 
@@ -68,6 +77,16 @@ class Attack implements HttpKernelInterface
         };
     }
 
+    private function setThrottleRepsonse()
+    {
+
+    }
+
+    private function defaultThrottleResponse()
+    {
+
+    }
+
     private function whitelisted(Request $request)
     {
         $whitelist = $this->filters->getWhitelist();
@@ -96,5 +115,10 @@ class Attack implements HttpKernelInterface
         }
 
         return false;
+    }
+
+    private function checkThrottle(Request $request)
+    {
+        return true;
     }
 }

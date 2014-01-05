@@ -33,9 +33,17 @@ $filters = (new FilterCollection)
 
 $config = [
     'blacklistedResponse' => function (Request $request) {
-            // A 503 response makes some bots think they had a successful DDOS
-            return new Response('Service Unavailable', 503);
+        // A 503 response makes some bots think they had a successful DDOS
+        return new Response('Service Unavailable', 503);
+    },
+    'throttle' => [
+        'key' => 'ip',
+        'maxRequests' => 60,
+        'period' => 60,
+        'httpResponse' => function (Request $request) {
+            return new Response('Rate Limit Exceeded', 403);
         }
+    ]
 ];
 
 $app = (new Stack\Builder)
