@@ -31,21 +31,17 @@ class Attack implements HttpKernelInterface
         $this->filters = $filters;
         $this->config = $config;
 
-        $this->setBlacklistedResponse();
-        $this->setThrottleResponse();
+        $this->blacklistMesage = ($request->attributes->has('stack.attack.match_message')) ? $request->attributes->get('stack.attack.match_message') : 'Unauthorized';
+        $this->throttleMessage = ($request->attributes->has('stack.attack.match_message')) ? $request->attributes->get('stack.attack.match_message') : 'Slow down...';
     }
 
     public function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true)
     {
-        // If this is not a whitelisted request, check the blacklist.
+        // If this is not a whitelisted request, check the blacklist and the throttle.
         if (! $this->whitelisted($request)) {
             if ($this->blacklisted($request)) {
                 return call_user_func($this->blacklistedResponse, $request);
-            }
-        }
-
-        if (!is_null($this->throttleResponse)) {
-            if (! $this->checkThrottle()) {
+            } else if (! $this->checkThrottle()) {
                 return call_user_func($this->throttleResponse, $request);
             }
         }
@@ -77,12 +73,13 @@ class Attack implements HttpKernelInterface
         };
     }
 
-    private function setThrottleRepsonse()
+    private function setRepsonses()
     {
+        $this->blacklistedResponse = (isset($this->config['blacklistedResponse'])) ?
 
     }
 
-    private function defaultThrottleResponse()
+    private function defaultResponses()
     {
 
     }
