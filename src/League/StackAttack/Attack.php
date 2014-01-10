@@ -1,48 +1,61 @@
-<?php
-
-namespace League\StackAttack;
+<?php namespace League\StackAttack;
 
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use League\StackAttack\Throttle;
 
 class Attack implements HttpKernelInterface
 {
     /**
      * @var \Symfony\Component\HttpKernel\HttpKernelInterface
      */
-    private $app;
+    protected $app;
 
     /**
      * @var \Closure
      */
-    private $blacklistedResponse;
-
-    private $throttleResponse;
+    protected $blacklistedResponse;
 
     /**
      * @var FilterCollection
      */
-    private $filters;
+    protected $filters;
 
-    public function __construct(HttpKernelInterface $app, FilterCollection $filters, array $config = array())
+    protected $throttle;
+
+    public function __construct(
+        HttpKernelInterface $app,
+        FilterCollection $filters,
+        $throttle = null,
+        array $config = array()
+    )
     {
         $this->app = $app;
         $this->filters = $filters;
         $this->config = $config;
+        $this->throttle = $throttle;
 
-        $this->blacklistMesage = ($request->attributes->has('stack.attack.match_message')) ? $request->attributes->get('stack.attack.match_message') : 'Unauthorized';
-        $this->throttleMessage = ($request->attributes->has('stack.attack.match_message')) ? $request->attributes->get('stack.attack.match_message') : 'Slow down...';
+        $this->setBlacklistedResponse();
     }
 
     public function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true)
     {
-        // If this is not a whitelisted request, check the blacklist and the throttle.
+        // If this is not a whitelisted request...
         if (! $this->whitelisted($request)) {
+
+            // ...first check the blacklist...
             if ($this->blacklisted($request)) {
                 return call_user_func($this->blacklistedResponse, $request);
-            } else if (! $this->checkThrottle()) {
-                return call_user_func($this->throttleResponse, $request);
+            }
+
+            // ... then, if we are using the throttle...
+            if (!is_null($this->throttle)) {
+
+                // ...and our request exceeds the rate limit...
+                if (! $this->checkThrottle($request)) {
+                    return call_user_func($this->throttle->response, $request);
+                }
             }
         }
 
@@ -60,7 +73,7 @@ class Attack implements HttpKernelInterface
         }
     }
 
-    private function defaultBlacklistedResponse()
+    protected function defaultBlacklistedResponse()
     {
         $this->blacklistedResponse = function (Request $request) {
             $message = 'Unauthorized';
@@ -73,18 +86,7 @@ class Attack implements HttpKernelInterface
         };
     }
 
-    private function setRepsonses()
-    {
-        $this->blacklistedResponse = (isset($this->config['blacklistedResponse'])) ?
-
-    }
-
-    private function defaultResponses()
-    {
-
-    }
-
-    private function whitelisted(Request $request)
+    protected function whitelisted(Request $request)
     {
         $whitelist = $this->filters->getWhitelist();
         if (!empty($whitelist)) {
@@ -99,7 +101,7 @@ class Attack implements HttpKernelInterface
         return false;
     }
 
-    private function blacklisted(Request $request)
+    protected function blacklisted(Request $request)
     {
         $blacklist = $this->filters->getBlacklist();
         if (!empty($blacklist)) {
@@ -114,8 +116,7 @@ class Attack implements HttpKernelInterface
         return false;
     }
 
-    private function checkThrottle(Request $request)
-    {
-        return true;
+    protected function checkThrottle(Request $request) {
+        return $this->throttle->checkRate($request);
     }
 }
