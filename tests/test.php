@@ -1,6 +1,4 @@
-<?php
-
-namespace Stack;
+<?php namespace Stack;
 
 include_once '../vendor/autoload.php';
 

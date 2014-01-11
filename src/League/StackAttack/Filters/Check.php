@@ -21,7 +21,7 @@ abstract class Check
      */
     protected $type;
 
-    public function __construct($message, \Closure $rule)
+    public function __construct(\Closure $rule, $message = null)
     {
         $this->message = $message;
         $this->rule = $rule;

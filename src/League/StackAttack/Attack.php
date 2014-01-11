@@ -13,110 +13,56 @@ class Attack implements HttpKernelInterface
     protected $app;
 
     /**
-     * @var \Closure
-     */
-    protected $blacklistedResponse;
-
-    /**
      * @var FilterCollection
      */
     protected $filters;
 
+    /**
+     * @var Throttle
+     */
     protected $throttle;
 
-    public function __construct(
-        HttpKernelInterface $app,
-        FilterCollection $filters,
-        $throttle = null,
-        array $config = array()
-    )
-    {
+    /**
+     * Class Constructor
+     *
+     * @param HttpKernelInterface $app      The App instance
+     * @param FilterCollection    $filters  The filter object we are using
+     * @param Throttle            $throttle The throttle object we are using
+     */
+    public function __construct(HttpKernelInterface $app, $filters = null, $throttle = null) {
         $this->app = $app;
         $this->filters = $filters;
-        $this->config = $config;
         $this->throttle = $throttle;
-
-        $this->setBlacklistedResponse();
     }
 
+    /**
+     * Handle method
+     *
+     * @param  Request  $request Request object
+     * @param  int      $type    Request type
+     * @param  boolean  $catch   Catch exceptions?
+     * @return Response         Returns response
+     */
     public function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true)
     {
-        // If this is not a whitelisted request...
-        if (! $this->whitelisted($request)) {
+        // if we have filters...
+        if ($this->filters) {
+            // is this a whitelisted request?
+            if ($this->filters->checkWhitelist($request)) {
+                return $this->app->handle($request, $type, $catch);
 
-            // ...first check the blacklist...
-            if ($this->blacklisted($request)) {
-                return call_user_func($this->blacklistedResponse, $request);
+            // is this a blacklisted request?
+            } elseif ($this->filters->checkBlacklist($request)) {
+                return call_user_func($this->filter->blacklistResponse, $request);
             }
+        }
 
-            // ... then, if we are using the throttle...
-            if (!is_null($this->throttle)) {
-
-                // ...and our request exceeds the rate limit...
-                if (! $this->checkThrottle($request)) {
-                    return call_user_func($this->throttle->response, $request);
-                }
-            }
+        // if we have a throttle...
+        if ($this->throttle && $this->throttle->checkThrottle($request)) {
+            return call_user_func($this->throttle->throttleResponse(), $request);
         }
 
         return $this->app->handle($request, $type, $catch);
     }
 
-    public function setBlacklistedResponse(\Closure $func = null)
-    {
-        if ($func !== null) {
-            $this->blacklistedResponse = $func;
-        } elseif (isset($this->config['blacklistedResponse']) && ($this->config['blacklistedResponse'] instanceof \Closure)) {
-            $this->blacklistedResponse = $this->config['blacklistedResponse'];
-        } else {
-            $this->defaultBlacklistedResponse();
-        }
-    }
-
-    protected function defaultBlacklistedResponse()
-    {
-        $this->blacklistedResponse = function (Request $request) {
-            $message = 'Unauthorized';
-
-            if ($request->attributes->has('stack.attack.match_message')) {
-                $message = $request->attributes->get('stack.attack.match_message');
-            }
-
-            return new Response($message, 401);
-        };
-    }
-
-    protected function whitelisted(Request $request)
-    {
-        $whitelist = $this->filters->getWhitelist();
-        if (!empty($whitelist)) {
-            foreach ($whitelist as $rule) {
-                // If the rule passes, then this is a whitelisted request.
-                if ($rule->test($request) === true) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    protected function blacklisted(Request $request)
-    {
-        $blacklist = $this->filters->getBlacklist();
-        if (!empty($blacklist)) {
-            foreach ($blacklist as $rule) {
-                // If the rule passes, then this is a blacklisted request.
-                if ($rule->test($request)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    protected function checkThrottle(Request $request) {
-        return $this->throttle->checkRate($request);
-    }
 }

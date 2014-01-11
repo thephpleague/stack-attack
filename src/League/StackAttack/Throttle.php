@@ -5,27 +5,68 @@ use League\StackAttack\CacheAdapter\CacheAdapterInterface;
 
 class Throttle
 {
+    /**
+     * Default config options
+     *
+     * @var [type]
+     */
     protected $config = [
-        'cacheKey' => 'api',
+        'cacheKey'    => 'api',
         'maxRequests' => 60,
-        'interval' => 60
+        'interval'    => 60,
+        'property'    => null,
+        'throttleResponse' => [
+            'message' => 'Slow Down',
+            'code'    => 429
+        ]
     ];
 
+    /**
+     * Cache Object to use
+     *
+     * @var \CacheAdapterInterface
+     */
     protected $cache;
 
-    public $response;
+    /**
+     * Response
+     *
+     * @var \Closure
+     */
+    public $throttleResponse;
 
-    public function __construct(CacheAdapterInterface $cache, \Closure $response, array $config = array()) {
+    /**
+     * Class constructor
+     *
+     * @param CacheAdapterInterface $cache  Cache object
+     * @param array                 $config Configs
+     */
+    public function __construct(CacheAdapterInterface $cache, array $config = array()) {
 
         $this->config = array_merge($this->config, $config);
         $this->cache = $cache;
-        $this->response = $response;
+
+        // Set default property
+        if (is_null($this->config['property'])) {
+            $this->config['property'] = function (Request $request) {
+                return $request->getClientIp();
+            }
+        }
+
+        $this->defaultResponse();
 
     }
 
+    /**
+     * Check request rate
+     *
+     * @param  Request $request request object
+     * @return bool             Under the rate or not
+     */
     public function checkRate(Request $request) {
         $prefix = $this->config['cacheKey'];
-        $key = sprintf("$prefix:%s", $request->getClientIp());
+        $value = call_user_func($request, $this->config['property']);
+        $key = sprintf("$prefix:%s", $value);
 
         if ($value = $this->cache->get($key)) {
             $value++;
@@ -34,6 +75,20 @@ class Throttle
         } else {
             $this->cache->set($key, 0, $this->config['interval']);
             return true;
+        }
+    }
+
+    /**
+     * Set the default response
+     *
+     * @return null
+     */
+    public function defaultResponse()
+    {
+        $message = $this->config['throttleResponse']['message'];
+        $code = $this->config['throttleResponse']['code'];
+        $this->throttleResponse = function() {
+            return new Response($message, $code);
         }
     }
 }

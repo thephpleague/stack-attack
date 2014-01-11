@@ -28,34 +28,53 @@ $app = new Stack\CallableHttpKernel(function (Request $request) {
     return new Response('Hello World!');
 });
 
-// Create a filter collection for the blacklist
-$filters = (new FilterCollection)
-    ->blacklist('Block dev requests.', function (Request $request) {
-        return strpos($request->getPathInfo(), '/dev') === 0;
-    });
-
-// Create config array with blacklist response and throttle parameters
+// set up configuration array
 $config = [
-    'blacklistedResponse' => function (Request $request) {
-        // A 503 response makes some bots think they had a successful DDOS
-        return new Response('Service Unavailable', 503);
-    }
+    'whitelist' => [
+        ['rule' => function (Request $request) {
+            return strpos($request->getPathInfo(), '/happy') === 0;
+        }],
+        ['rule' => function (Request $request) {
+            return $request->getClientIp() === '1.2.3.4';
+        }],
+    ],
+    'blacklist' => [
+        ['rule' => function (Request $request) {
+            return strpos($request->getPathInfo(), '/dev') === 0;
+        }],
+        ['rule' => function (Request $request) {
+            return $request->getClientIp() === '4.2.2.2';
+        }],
+    ],
+    'blacklistResponse' => [
+        'message' => 'Blocked',
+        'code'    => 503
+    ]
 ];
 
+// Set up our filters
+$filters = new FilterCollection($config);
+
+// If using the throttle feature, set that up, too.
 $throttleConfig = [
-    'cacheKey' => 'api',
+    'cacheKey'    => 'api',
     'maxRequests' => 60,
-    'interval' => 60
+    'interval'    => 60,
+    'property'    => function (Request $request) {
+        return $request->getClientIp();
+    },
+    'throttleResponse' => [
+        'message' => 'Slow Down',
+        'code'    => 429
+    ]
 ];
 
-$throttleResponse = function (Request $request) {
-    return new Response('Rate Limit Exceeded', 403);
-};
-
-$throttle = new Throttle($myCache, $throttleResponse, $throttleConfig);
+// Set up the cache object if you're going to use the throttle...
+$cache = new IlluminateAdapter($myCacheInstance);
+$throttle = new Throttle($cache, $throttleConfig);
 
 $app = (new Stack\Builder)
-    ->push('League\\StackAttack\\Attack', $filters, $throttle, $config)
+    ->push('League\\StackAttack\\Attack', $filters, $throttle)
     ->resolve($app);
 
 Stack\run($app);
