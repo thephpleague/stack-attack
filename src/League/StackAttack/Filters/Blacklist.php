@@ -3,6 +3,4 @@
 class Blacklist extends Check
 {
     protected $type = 'blacklist';
-
-    public function response()
 }
