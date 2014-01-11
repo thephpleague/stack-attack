@@ -4,6 +4,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use League\StackAttack\Throttle;
+use League\StackAttack\FilterCollection;
 
 class Attack implements HttpKernelInterface
 {
@@ -31,8 +32,15 @@ class Attack implements HttpKernelInterface
      */
     public function __construct(HttpKernelInterface $app, $filters = null, $throttle = null) {
         $this->app = $app;
-        $this->filters = $filters;
-        $this->throttle = $throttle;
+
+        if (!is_null($filters) && $filters instanceof FilterCollection) {
+            $this->filters = $filters;
+        }
+
+        if (!is_null($throttle) && $throttle instanceof Throttle) {
+            $this->throttle = $throttle;
+        }
+
     }
 
     /**
