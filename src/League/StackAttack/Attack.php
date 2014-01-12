@@ -1,100 +1,49 @@
-<?php
-
-namespace League\StackAttack;
+<?php namespace League\StackAttack;
 
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use League\StackAttack\Throttle;
+use League\StackAttack\FilterCollection;
 
 class Attack implements HttpKernelInterface
 {
     /**
      * @var \Symfony\Component\HttpKernel\HttpKernelInterface
      */
-    private $app;
-
-    /**
-     * @var \Closure
-     */
-    private $blacklistedResponse;
+    protected $app;
 
     /**
      * @var FilterCollection
      */
-    private $filters;
+    protected $filters;
 
-    public function __construct(HttpKernelInterface $app, FilterCollection $filters, array $config = array())
-    {
+    /**
+     * Class Constructor
+     *
+     * @param HttpKernelInterface $app      The App instance
+     * @param FilterCollection    $filters  The filter object we are using
+     */
+    public function __construct(HttpKernelInterface $app, FilterCollection $filters) {
         $this->app = $app;
         $this->filters = $filters;
-        $this->config = $config;
-
-        $this->setBlacklistedResponse();
+        $this->filters->setRequest($this->app);
     }
 
+    /**
+     * Handle method
+     *
+     * @param  Request  $request Request object
+     * @param  int      $type    Request type
+     * @param  boolean  $catch   Catch exceptions?
+     * @return Response         Returns response
+     */
     public function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true)
     {
-        // If this is not a whitelisted request, check the blacklist.
-        if (! $this->whitelisted($request)) {
-            if ($this->blacklisted($request)) {
-                return call_user_func($this->blacklistedResponse, $request);
-            }
+        // check the filters - "true" means you can pass, "false" means go away
+        if (! $this->filters->checkFilters($request)) {
+            return $this->filters->response;
         }
 
         return $this->app->handle($request, $type, $catch);
-    }
-
-    public function setBlacklistedResponse(\Closure $func = null)
-    {
-        if ($func !== null) {
-            $this->blacklistedResponse = $func;
-        } elseif (isset($this->config['blacklistedResponse']) && ($this->config['blacklistedResponse'] instanceof \Closure)) {
-            $this->blacklistedResponse = $this->config['blacklistedResponse'];
-        } else {
-            $this->defaultBlacklistedResponse();
-        }
-    }
-
-    private function defaultBlacklistedResponse()
-    {
-        $this->blacklistedResponse = function (Request $request) {
-            $message = 'Unauthorized';
-
-            if ($request->attributes->has('stack.attack.match_message')) {
-                $message = $request->attributes->get('stack.attack.match_message');
-            }
-
-            return new Response($message, 401);
-        };
-    }
-
-    private function whitelisted(Request $request)
-    {
-        $whitelist = $this->filters->getWhitelist();
-        if (!empty($whitelist)) {
-            foreach ($whitelist as $rule) {
-                // If the rule passes, then this is a whitelisted request.
-                if ($rule->test($request) === true) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private function blacklisted(Request $request)
-    {
-        $blacklist = $this->filters->getBlacklist();
-        if (!empty($blacklist)) {
-            foreach ($blacklist as $rule) {
-                // If the rule passes, then this is a blacklisted request.
-                if ($rule->test($request)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 }

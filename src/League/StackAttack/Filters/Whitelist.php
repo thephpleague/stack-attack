@@ -1,6 +1,4 @@
-<?php
-
-namespace League\StackAttack\Filters;
+<?php namespace League\StackAttack\Filters;
 
 class Whitelist extends Check
 {
