@@ -49,32 +49,30 @@ $config = [
     'blacklistResponse' => [
         'message' => 'Blocked',
         'code'    => 503
+    ],
+    'throttle' => [
+        'cacheKey'    => 'api',
+        'maxRequests' => 60,
+        'interval'    => 60,
+        'property'    => function (Request $request) {
+            return $request->getClientIp();
+        },
+        'throttleResponse' => [
+            'message' => 'Slow Down',
+            'code'    => 429
+        ]
     ]
 ];
 
-// Set up our filters
-$filters = new FilterCollection($config);
-
-// If using the throttle feature, set that up, too.
-$throttleConfig = [
-    'cacheKey'    => 'api',
-    'maxRequests' => 60,
-    'interval'    => 60,
-    'property'    => function (Request $request) {
-        return $request->getClientIp();
-    },
-    'throttleResponse' => [
-        'message' => 'Slow Down',
-        'code'    => 429
-    ]
-];
-
-// Set up the cache object if you're going to use the throttle...
+// If using the throttle, set up the cache instance
 $cache = new IlluminateAdapter($myCacheInstance);
-$throttle = new Throttle($cache, $throttleConfig);
 
+// Set up the filter collection, passing in the cache if needed.
+$filters = new FilterCollection($config, $cache);
+
+// push the object, with filter collection and go
 $app = (new Stack\Builder)
-    ->push('League\\StackAttack\\Attack', $filters, $throttle)
+    ->push('League\\StackAttack\\Attack', $filters)
     ->resolve($app);
 
 Stack\run($app);

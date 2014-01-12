@@ -1,6 +1,7 @@
 <?php namespace League\StackAttack;
 
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use League\StackAttack\CacheAdapter\CacheAdapterInterface;
 
 class Throttle
@@ -53,6 +54,7 @@ class Throttle
             }
         }
 
+        // Set the default response
         $this->defaultResponse();
 
     }
@@ -64,10 +66,12 @@ class Throttle
      * @return bool             Under the rate or not
      */
     public function checkRate(Request $request) {
+        // Get our base values
         $prefix = $this->config['cacheKey'];
         $value = call_user_func($request, $this->config['property']);
         $key = sprintf("$prefix:%s", $value);
 
+        // check the cache
         if ($value = $this->cache->get($key)) {
             $value++;
             // Are we under the rate limit?

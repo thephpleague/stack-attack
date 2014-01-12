@@ -1,7 +1,6 @@
 <?php namespace League\StackAttack;
 
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use League\StackAttack\Throttle;
 use League\StackAttack\FilterCollection;
@@ -19,21 +18,15 @@ class Attack implements HttpKernelInterface
     protected $filters;
 
     /**
-     * @var Throttle
-     */
-    protected $throttle;
-
-    /**
      * Class Constructor
      *
      * @param HttpKernelInterface $app      The App instance
      * @param FilterCollection    $filters  The filter object we are using
-     * @param Throttle            $throttle The throttle object we are using
      */
-    public function __construct(HttpKernelInterface $app, FilterCollection $filters = null, Throttle $throttle = null) {
+    public function __construct(HttpKernelInterface $app, FilterCollection $filters) {
         $this->app = $app;
         $this->filters = $filters;
-        $this->throttle = $throttle;
+        $this->filters->setRequest($this->app);
     }
 
     /**
@@ -46,24 +39,11 @@ class Attack implements HttpKernelInterface
      */
     public function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true)
     {
-        // if we have filters...
-        if ($this->filters) {
-            // is this a whitelisted request?
-            if ($this->filters->checkWhitelist($request)) {
-                return $this->app->handle($request, $type, $catch);
-
-            // is this a blacklisted request?
-            } elseif ($this->filters->checkBlacklist($request)) {
-                return call_user_func($this->filter->blacklistResponse, $request);
-            }
-        }
-
-        // if we have a throttle...
-        if ($this->throttle && $this->throttle->checkThrottle($request)) {
-            return call_user_func($this->throttle->throttleResponse(), $request);
+        // check the filters - "true" means you can pass, "false" means go away
+        if (! $this->filters->checkFilters($request)) {
+            return $this->filters->response;
         }
 
         return $this->app->handle($request, $type, $catch);
     }
-
 }
