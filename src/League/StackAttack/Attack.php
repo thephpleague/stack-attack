@@ -30,17 +30,10 @@ class Attack implements HttpKernelInterface
      * @param FilterCollection    $filters  The filter object we are using
      * @param Throttle            $throttle The throttle object we are using
      */
-    public function __construct(HttpKernelInterface $app, $filters = null, $throttle = null) {
+    public function __construct(HttpKernelInterface $app, FilterCollection $filters = null, Throttle $throttle = null) {
         $this->app = $app;
-
-        if (!is_null($filters) && $filters instanceof FilterCollection) {
-            $this->filters = $filters;
-        }
-
-        if (!is_null($throttle) && $throttle instanceof Throttle) {
-            $this->throttle = $throttle;
-        }
-
+        $this->filters = $filters;
+        $this->throttle = $throttle;
     }
 
     /**
